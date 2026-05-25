@@ -3,22 +3,842 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>BugTracker - 简易Bug管理系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; background: #1a1a2e; font-family: 'Segoe UI', sans-serif;
-        }
-        .container { text-align: center; }
-        h1 { color: #e94560; font-size: 4rem; margin-bottom: 1rem; }
-        p { color: #a8a8b3; font-size: 1.2rem; }
+        body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+        /* ===== Login Page ===== */
+        .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .login-box { background: #fff; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 40px; width: 420px; max-width: 95%; }
+        .login-box h1 { text-align: center; margin-bottom: 8px; color: #1a1a2e; font-size: 28px; }
+        .login-box .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+        .login-box input { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; font-size: 15px; outline: none; transition: border-color 0.3s; }
+        .login-box input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .login-box button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: opacity 0.3s; }
+        .login-box button:hover { opacity: 0.9; }
+        .login-error { color: #e74c3c; text-align: center; font-size: 13px; margin-top: 12px; min-height: 20px; }
+        .demo-accounts { margin-top: 24px; background: #f8f9fa; border-radius: 8px; padding: 16px; font-size: 12px; }
+        .demo-accounts h3 { margin-bottom: 10px; color: #555; }
+        .demo-accounts table { width: 100%; border-collapse: collapse; }
+        .demo-accounts th, .demo-accounts td { padding: 4px 8px; text-align: left; border-bottom: 1px solid #e9ecef; }
+        .demo-accounts th { color: #888; font-weight: 500; }
+
+        /* ===== Main App Layout ===== */
+        .app-header { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .app-header .logo { font-size: 20px; font-weight: 700; color: #667eea; }
+        .app-header .user-info { display: flex; align-items: center; gap: 16px; }
+        .app-header .user-name { font-size: 14px; color: #333; }
+        .role-badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .role-admin { background: #e74c3c; color: #fff; }
+        .role-employee { background: #3498db; color: #fff; }
+        .role-customer { background: #2ecc71; color: #fff; }
+        .btn-logout { background: none; border: 1px solid #ddd; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #666; transition: all 0.3s; }
+        .btn-logout:hover { border-color: #e74c3c; color: #e74c3c; }
+
+        .app-body { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* ===== Dashboard ===== */
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .dashboard-header h2 { font-size: 24px; color: #1a1a2e; }
+        .btn-primary { background: #667eea; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: background 0.3s; }
+        .btn-primary:hover { background: #5a6fd6; }
+
+        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; }
+        .stat-card .num { font-size: 28px; font-weight: 700; }
+        .stat-card .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .stat-new .num { color: #9b59b6; }
+        .stat-assigned .num { color: #3498db; }
+        .stat-fixed .num { color: #f39c12; }
+        .stat-closed .num { color: #2ecc71; }
+
+        .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .filter-bar select, .filter-bar input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; }
+
+        /* ===== Bug Table ===== */
+        .bug-table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .bug-table table { width: 100%; border-collapse: collapse; }
+        .bug-table th { background: #f8f9fa; padding: 12px 16px; text-align: left; font-size: 13px; color: #666; font-weight: 600; border-bottom: 1px solid #e9ecef; }
+        .bug-table td { padding: 12px 16px; border-bottom: 1px solid #f0f2f5; font-size: 14px; color: #333; }
+        .bug-table tr:hover td { background: #f8f9ff; }
+        .bug-table .bug-id { color: #667eea; font-weight: 600; cursor: pointer; }
+        .bug-table .bug-id:hover { text-decoration: underline; }
+        .bug-table .bug-title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .bug-table .bug-title:hover { color: #667eea; }
+
+        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .status-new { background: #f3e8ff; color: #8b5cf6; }
+        .status-assigned { background: #dbeafe; color: #3b82f6; }
+        .status-need_info { background: #fef3c7; color: #f59e0b; }
+        .status-fixed { background: #d1fae5; color: #10b981; }
+        .status-closed { background: #e2e8f0; color: #64748b; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: #888; }
+        .empty-state svg { width: 64px; height: 64px; margin-bottom: 16px; opacity: 0.3; }
+
+        /* ===== Bug Detail Page ===== */
+        .bug-detail { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
+        .bug-detail-header { padding: 24px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: flex-start; }
+        .bug-detail-header .back-link { color: #667eea; cursor: pointer; font-size: 14px; margin-bottom: 8px; display: inline-block; }
+        .bug-detail-header .back-link:hover { text-decoration: underline; }
+        .bug-detail-header h2 { font-size: 22px; color: #1a1a2e; margin-bottom: 12px; }
+        .bug-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: #666; }
+        .bug-meta span { display: flex; align-items: center; gap: 4px; }
+
+        .bug-detail-body { display: grid; grid-template-columns: 1fr 320px; gap: 0; }
+        @media (max-width: 768px) { .bug-detail-body { grid-template-columns: 1fr; } }
+
+        .bug-content { padding: 24px; border-right: 1px solid #e9ecef; }
+        .bug-description { font-size: 14px; color: #333; line-height: 1.6; white-space: pre-wrap; background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0; }
+
+        .bug-sidebar { padding: 24px; }
+        .sidebar-section { margin-bottom: 24px; }
+        .sidebar-section h4 { font-size: 13px; color: #888; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+
+        .status-actions { display: flex; flex-direction: column; gap: 8px; }
+        .btn-status { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.3s; text-align: center; }
+        .btn-status:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-assign { background: #3b82f6; color: #fff; }
+        .btn-need-info { background: #f59e0b; color: #fff; }
+        .btn-fixed { background: #10b981; color: #fff; }
+        .btn-close { background: #64748b; color: #fff; }
+        .btn-reopen { background: #8b5cf6; color: #fff; }
+
+        /* ===== Comments Section ===== */
+        .comments-section { padding: 24px; border-top: 1px solid #e9ecef; }
+        .comments-section h3 { font-size: 16px; margin-bottom: 16px; color: #1a1a2e; }
+        .comment-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+        .comment { display: flex; gap: 12px; }
+        .comment-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0; }
+        .comment-body { flex: 1; background: #f8f9fa; padding: 12px 16px; border-radius: 10px; }
+        .comment-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
+        .comment-author { font-weight: 600; color: #333; }
+        .comment-time { color: #888; }
+        .comment-text { font-size: 14px; color: #333; line-height: 1.5; white-space: pre-wrap; }
+
+        .comment-form { display: flex; gap: 12px; }
+        .comment-form textarea { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 60px; font-size: 14px; outline: none; }
+        .comment-form textarea:focus { border-color: #667eea; }
+        .comment-form button { align-self: flex-end; }
+
+        /* ===== Attachments ===== */
+        .attachments-section { padding: 24px; border-top: 1px solid #e9ecef; }
+        .attachments-section h3 { font-size: 16px; margin-bottom: 16px; color: #1a1a2e; }
+        .attachment-list { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .attachment-item { background: #f0f2f5; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .attachment-item a { color: #667eea; text-decoration: none; }
+        .attachment-item a:hover { text-decoration: underline; }
+        .upload-area { border: 2px dashed #ddd; border-radius: 10px; padding: 24px; text-align: center; color: #888; cursor: pointer; transition: all 0.3s; }
+        .upload-area:hover { border-color: #667eea; color: #667eea; }
+        .upload-area.dragover { border-color: #667eea; background: #f0f4ff; }
+        .upload-area input { display: none; }
+
+        /* ===== New Bug Form ===== */
+        .form-container { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 32px; max-width: 800px; }
+        .form-container h2 { font-size: 22px; margin-bottom: 24px; color: #1a1a2e; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #667eea; }
+        .form-group textarea { min-height: 120px; resize: vertical; }
+        .form-actions { display: flex; gap: 12px; }
+        .btn-cancel { background: #fff; color: #666; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .btn-submit { background: #667eea; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+
+        /* ===== Toast Notification ===== */
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 1000; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* ===== Activity Log ===== */
+        .activity-log { padding: 16px 24px; border-top: 1px solid #e9ecef; background: #fafafa; }
+        .activity-log h4 { font-size: 13px; color: #888; margin-bottom: 10px; }
+        .log-entry { font-size: 12px; color: #666; padding: 6px 0; border-bottom: 1px solid #f0f2f5; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-entry strong { color: #333; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Hello World</h1>
-        <p>Welcome to my personal website</p>
-    </div>
+    <div id="app"></div>
+
+    <script>
+    // ============================================================
+    // DATA INITIALIZATION
+    // ============================================================
+    const DEFAULT_USERS = [
+        // Admin
+        { username: 'admin', password: 'admin123', role: 'admin', name: '系统管理员' },
+        // Employees (6)
+        { username: 'zhangsan', password: 'emp123', role: 'employee', name: '张三 - 开发' },
+        { username: 'lisi', password: 'emp123', role: 'employee', name: '李四 - 开发' },
+        { username: 'wangwu', password: 'emp123', role: 'employee', name: '王五 - 测试' },
+        { username: 'zhaoliu', password: 'emp123', role: 'employee', name: '赵六 - 运维' },
+        { username: 'sunqi', password: 'emp123', role: 'employee', name: '孙七 - 产品' },
+        { username: 'zhou8', password: 'emp123', role: 'employee', name: '周八 - 技术支持' },
+        // Customers (6)
+        { username: 'client1', password: 'cus123', role: 'customer', name: '客户-张三' },
+        { username: 'client2', password: 'cus123', role: 'customer', name: '客户-李四' },
+        { username: 'client3', password: 'cus123', role: 'customer', name: '客户-王五' },
+        { username: 'client4', password: 'cus123', role: 'customer', name: '客户-赵六' },
+        { username: 'client5', password: 'cus123', role: 'customer', name: '客户-孙七' },
+        { username: 'client6', password: 'cus123', role: 'customer', name: '客户-周八' }
+    ];
+
+    function initData() {
+        if (!localStorage.getItem('bt_initialized')) {
+            localStorage.setItem('bt_users', JSON.stringify(DEFAULT_USERS));
+            localStorage.setItem('bt_bugs', JSON.stringify([]));
+            localStorage.setItem('bt_next_id', '1');
+            localStorage.setItem('bt_initialized', '1');
+        }
+    }
+
+    // ============================================================
+    // STATE MANAGEMENT
+    // ============================================================
+    const State = {
+        currentUser: null,
+        bugs: [],
+        users: [],
+        nextId: 1,
+
+        load() {
+            this.users = JSON.parse(localStorage.getItem('bt_users') || '[]');
+            this.bugs = JSON.parse(localStorage.getItem('bt_bugs') || '[]');
+            this.nextId = parseInt(localStorage.getItem('bt_next_id') || '1');
+        },
+        save() {
+            localStorage.setItem('bt_bugs', JSON.stringify(this.bugs));
+            localStorage.setItem('bt_next_id', String(this.nextId));
+        },
+        getUsersByRole(role) {
+            return this.users.filter(u => u.role === role);
+        },
+        getBug(id) {
+            return this.bugs.find(b => b.id === id);
+        },
+        addBug(data) {
+            const bug = {
+                id: this.nextId++,
+                title: data.title,
+                description: data.description,
+                status: 'new',
+                assignee: data.assignee || null,
+                reporter: this.currentUser.username,
+                reporterName: this.currentUser.name,
+                comments: [],
+                attachments: [],
+                history: [{ action: 'Created', user: this.currentUser.name, time: new Date().toISOString() }],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            this.bugs.unshift(bug);
+            this.save();
+            return bug;
+        },
+        addComment(bugId, text) {
+            const bug = this.getBug(bugId);
+            if (!bug) return;
+            bug.comments.push({
+                id: Date.now(),
+                author: this.currentUser.username,
+                authorName: this.currentUser.name,
+                authorRole: this.currentUser.role,
+                text,
+                createdAt: new Date().toISOString()
+            });
+            bug.updatedAt = new Date().toISOString();
+            bug.history.push({
+                action: `Comment added by ${this.currentUser.name}`,
+                user: this.currentUser.name,
+                time: new Date().toISOString()
+            });
+            this.save();
+        },
+        updateStatus(bugId, newStatus) {
+            const bug = this.getBug(bugId);
+            if (!bug) return;
+            const oldStatus = bug.status;
+            bug.status = newStatus;
+            bug.updatedAt = new Date().toISOString();
+            bug.history.push({
+                action: `Status changed: ${oldStatus} → ${newStatus}`,
+                user: this.currentUser.name,
+                time: new Date().toISOString()
+            });
+            this.save();
+        },
+        assignBug(bugId, assignee) {
+            const bug = this.getBug(bugId);
+            if (!bug) return;
+            bug.assignee = assignee;
+            if (bug.status === 'new') bug.status = 'assigned';
+            bug.updatedAt = new Date().toISOString();
+            const emp = this.users.find(u => u.username === assignee);
+            bug.history.push({
+                action: `Assigned to ${emp ? emp.name : assignee}`,
+                user: this.currentUser.name,
+                time: new Date().toISOString()
+            });
+            this.save();
+        },
+        addAttachment(bugId, file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const bug = this.getBug(bugId);
+                    if (!bug) { resolve(null); return; }
+                    // Limit: 2MB per file
+                    if (e.target.result.length > 2 * 1024 * 1024) {
+                        alert('文件大小超过2MB限制！');
+                        resolve(null);
+                        return;
+                    }
+                    bug.attachments.push({
+                        id: Date.now(),
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result,
+                        uploadedBy: this.currentUser.name,
+                        createdAt: new Date().toISOString()
+                    });
+                    bug.updatedAt = new Date().toISOString();
+                    bug.history.push({
+                        action: `Attachment "${file.name}" uploaded by ${this.currentUser.name}`,
+                        user: this.currentUser.name,
+                        time: new Date().toISOString()
+                    });
+                    this.save();
+                    resolve(bug.attachments[bug.attachments.length - 1]);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    };
+
+    // ============================================================
+    // AUTH
+    // ============================================================
+    function login(username, password) {
+        const user = State.users.find(u => u.username === username && u.password === password);
+        if (user) {
+            State.currentUser = user;
+            localStorage.setItem('bt_session', JSON.stringify(user));
+            return true;
+        }
+        return false;
+    }
+
+    function logout() {
+        State.currentUser = null;
+        localStorage.removeItem('bt_session');
+        renderLogin();
+    }
+
+    function restoreSession() {
+        const session = localStorage.getItem('bt_session');
+        if (session) {
+            State.currentUser = JSON.parse(session);
+            State.load();
+            renderDashboard();
+        } else {
+            renderLogin();
+        }
+    }
+
+    // ============================================================
+    // TOAST
+    // ============================================================
+    function showToast(msg) {
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    // ============================================================
+    // ROUTING
+    // ============================================================
+    function navigate(route) {
+        location.hash = route;
+    }
+
+    window.addEventListener('hashchange', () => {
+        if (!State.currentUser) return;
+        const hash = location.hash.slice(1);
+        if (hash.startsWith('#/bug/')) {
+            const id = parseInt(hash.split('/')[2]);
+            renderBugDetail(id);
+        } else if (hash === '#/new') {
+            renderNewBug();
+        } else if (hash === '#/dashboard' || hash === '' || hash === '/') {
+            renderDashboard();
+        }
+    });
+
+    // ============================================================
+    // RENDER: LOGIN
+    // ============================================================
+    function renderLogin() {
+        State.currentUser = null;
+        document.getElementById('app').innerHTML = `
+        <div class="login-container">
+            <div class="login-box">
+                <h1>🐛 BugTracker</h1>
+                <p class="subtitle">简易Bug管理系统</p>
+                <form id="login-form">
+                    <input type="text" id="login-user" placeholder="用户名" required autofocus>
+                    <input type="password" id="login-pass" placeholder="密码" required>
+                    <button type="submit">登 录</button>
+                    <div class="login-error" id="login-error"></div>
+                </form>
+                <details class="demo-accounts">
+                    <summary style="cursor:pointer;color:#667eea;font-weight:600;">📋 演示账号列表（点击展开）</summary>
+                    <table>
+                        <tr><th>角色</th><th>用户名</th><th>密码</th></tr>
+                        <tr><td><span class="role-badge role-admin">管理员</span></td><td>admin</td><td>admin123</td></tr>
+                        <tr><td><span class="role-badge role-employee">员工</span></td><td>zhangsan ~ zhou8</td><td>emp123</td></tr>
+                        <tr><td><span class="role-badge role-customer">客户</span></td><td>client1 ~ client6</td><td>cus123</td></tr>
+                    </table>
+                </details>
+            </div>
+        </div>`;
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('login-user').value.trim();
+            const p = document.getElementById('login-pass').value;
+            if (login(u, p)) {
+                State.load();
+                navigate('#/dashboard');
+            } else {
+                document.getElementById('login-error').textContent = '用户名或密码错误';
+            }
+        });
+    }
+
+    // ============================================================
+    // RENDER: HEADER
+    // ============================================================
+    function renderHeader() {
+        const u = State.currentUser;
+        const roleLabel = { admin: '管理员', employee: '员工', customer: '客户' };
+        const roleClass = { admin: 'role-admin', employee: 'role-employee', customer: 'role-customer' };
+        return `
+        <header class="app-header">
+            <div class="logo">🐛 BugTracker</div>
+            <div class="user-info">
+                <span class="user-name">${u.name}</span>
+                <span class="role-badge ${roleClass[u.role]}">${roleLabel[u.role]}</span>
+                <button class="btn-logout" onclick="logout()">退出登录</button>
+            </div>
+        </header>`;
+    }
+
+    // ============================================================
+    // RENDER: DASHBOARD
+    // ============================================================
+    function renderDashboard() {
+        State.load();
+        const u = State.currentUser;
+        let filteredBugs = [];
+
+        if (u.role === 'customer') {
+            filteredBugs = State.bugs.filter(b => b.reporter === u.username);
+        } else if (u.role === 'employee') {
+            filteredBugs = State.bugs.filter(b => b.assignee === u.username || u.role === 'employee');
+            // Employees see all bugs for collaboration, or just assigned
+            filteredBugs = State.bugs;
+        } else {
+            filteredBugs = State.bugs;
+        }
+
+        // Stats
+        const stats = {
+            new: filteredBugs.filter(b => b.status === 'new').length,
+            assigned: filteredBugs.filter(b => b.status === 'assigned').length,
+            need_info: filteredBugs.filter(b => b.status === 'need_info').length,
+            fixed: filteredBugs.filter(b => b.status === 'fixed').length,
+            closed: filteredBugs.filter(b => b.status === 'closed').length,
+            total: filteredBugs.length
+        };
+
+        const statusLabels = {
+            new: '新建', assigned: '已分配', need_info: '需补充信息', fixed: '已修复', closed: '已关闭'
+        };
+
+        let filterOptions = '';
+        for (const [k, v] of Object.entries(statusLabels)) {
+            filterOptions += `<option value="${k}">${v}</option>`;
+        }
+
+        let assigneeOptions = '<option value="">全部</option>';
+        State.getUsersByRole('employee').forEach(emp => {
+            assigneeOptions += `<option value="${emp.username}">${emp.name}</option>`;
+        });
+
+        const newBugBtn = u.role === 'customer' ? '<button class="btn-primary" onclick="navigate(\'#/new\')">+ 提交Bug</button>' : '';
+        const adminBtn = u.role === 'admin' ? '<button class="btn-primary" onclick="navigate(\'#/new\')" style="margin-left:8px;background:#e74c3c;">+ 创建工单</button>' : '';
+
+        const rows = filteredBugs.map(b => {
+            const emp = State.users.find(x => x.username === b.assignee);
+            const assigneeName = emp ? emp.name : (b.assignee ? b.assignee : '-');
+            return `<tr>
+                <td class="bug-id" onclick="navigate('#/bug/${b.id}')">BUG-${String(b.id).padStart(4, '0')}</td>
+                <td class="bug-title" onclick="navigate('#/bug/${b.id}')" title="${b.title}">${b.title}</td>
+                <td><span class="status-badge status-${b.status}">${statusLabels[b.status]}</span></td>
+                <td>${assigneeName}</td>
+                <td>${b.reporterName}</td>
+                <td style="color:#888;font-size:12px;">${new Date(b.updatedAt).toLocaleString('zh-CN')}</td>
+                <td>${b.comments.length}</td>
+                <td>${b.attachments.length}</td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('app').innerHTML = `
+        ${renderHeader()}
+        <div class="app-body">
+            <div class="dashboard-header">
+                <h2>工作台</h2>
+                <div>${newBugBtn}${adminBtn}</div>
+            </div>
+            <div class="stats-bar">
+                <div class="stat-card stat-new"><div class="num">${stats.new}</div><div class="label">新建</div></div>
+                <div class="stat-card stat-assigned"><div class="num">${stats.assigned}</div><div class="label">已分配</div></div>
+                <div class="stat-card"><div class="num" style="color:#f59e0b">${stats.need_info}</div><div class="label">需补充信息</div></div>
+                <div class="stat-card stat-fixed"><div class="num">${stats.fixed}</div><div class="label">已修复</div></div>
+                <div class="stat-card stat-closed"><div class="num">${stats.closed}</div><div class="label">已关闭</div></div>
+                <div class="stat-card"><div class="num" style="color:#333">${stats.total}</div><div class="label">总计</div></div>
+            </div>
+            <div class="filter-bar">
+                <select id="filter-status" onchange="applyFilters()">
+                    <option value="">全部状态</option>
+                    ${filterOptions}
+                </select>
+                <select id="filter-assignee" onchange="applyFilters()">
+                    ${assigneeOptions}
+                </select>
+                <input type="text" id="filter-search" placeholder="搜索标题..." oninput="applyFilters()">
+            </div>
+            <div class="bug-table" id="bug-table-body">
+                <table>
+                    <thead><tr>
+                        <th>编号</th><th>标题</th><th>状态</th><th>负责人</th><th>报告人</th><th>更新时间</th><th>评论</th><th>附件</th>
+                    </tr></thead>
+                    <tbody id="bug-tbody">
+                        ${rows || '<tr><td colspan="8" class="empty-state">暂无Bug记录</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <script>
+            // Store all bugs data for filtering
+            window._allBugs = ${JSON.stringify(filteredBugs.map(b => ({...b, reporterName: b.reporterName, status: b.status, assignee: b.assignee, id: b.id, title: b.title, reporter: b.reporter, comments: b.comments, attachments: b.attachments, updatedAt: b.updatedAt})))};
+            window._statusLabels = ${JSON.stringify(statusLabels)};
+            window._users = ${JSON.stringify(State.users)};
+
+            function applyFilters() {
+                const status = document.getElementById('filter-status').value;
+                const assignee = document.getElementById('filter-assignee').value;
+                const search = document.getElementById('filter-search').value.toLowerCase();
+
+                let filtered = window._allBugs;
+                if (status) filtered = filtered.filter(b => b.status === status);
+                if (assignee) filtered = filtered.filter(b => b.assignee === assignee);
+                if (search) filtered = filtered.filter(b => b.title.toLowerCase().includes(search));
+
+                const tbody = document.getElementById('bug-tbody');
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">无匹配记录</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = filtered.map(b => {
+                    const emp = window._users.find(x => x.username === b.assignee);
+                    const assigneeName = emp ? emp.name : (b.assignee ? b.assignee : '-');
+                    return '<tr>' +
+                        '<td class="bug-id" onclick="navigate(\'#/bug/' + b.id + '\')">BUG-' + String(b.id).padStart(4, '0') + '</td>' +
+                        '<td class="bug-title" onclick="navigate(\'#/bug/' + b.id + '\')" title="' + b.title + '">' + b.title + '</td>' +
+                        '<td><span class="status-badge status-' + b.status + '">' + window._statusLabels[b.status] + '</span></td>' +
+                        '<td>' + assigneeName + '</td>' +
+                        '<td>' + b.reporterName + '</td>' +
+                        '<td style="color:#888;font-size:12px;">' + new Date(b.updatedAt).toLocaleString('zh-CN') + '</td>' +
+                        '<td>' + b.comments.length + '</td>' +
+                        '<td>' + b.attachments.length + '</td>' +
+                    '</tr>';
+                }).join('');
+            }
+        <\/script>`;
+    }
+
+    // ============================================================
+    // RENDER: NEW BUG
+    // ============================================================
+    function renderNewBug() {
+        const employees = State.getUsersByRole('employee');
+        const assigneeOpts = employees.map(e =>
+            `<option value="${e.username}">${e.name}</option>`
+        ).join('');
+
+        document.getElementById('app').innerHTML = `
+        ${renderHeader()}
+        <div class="app-body">
+            <div class="form-container">
+                <h2>📝 提交新Bug</h2>
+                <form id="new-bug-form">
+                    <div class="form-group">
+                        <label>标题 *</label>
+                        <input type="text" id="bug-title" required placeholder="简明描述Bug现象">
+                    </div>
+                    <div class="form-group">
+                        <label>详细描述 *</label>
+                        <textarea id="bug-desc" required placeholder="详细描述Bug的表现、复现步骤、期望结果等..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>指派给</label>
+                        <select id="bug-assignee">
+                            <option value="">-- 暂不指派 --</option>
+                            ${assigneeOpts}
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="navigate('#/dashboard')">取消</button>
+                        <button type="submit" class="btn-submit">提交Bug</button>
+                    </div>
+                </form>
+            </div>
+        </div>`;
+
+        document.getElementById('new-bug-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const bug = State.addBug({
+                title: document.getElementById('bug-title').value.trim(),
+                description: document.getElementById('bug-desc').value.trim(),
+                assignee: document.getElementById('bug-assignee').value || null
+            });
+            showToast('Bug 提交成功！编号: BUG-' + String(bug.id).padStart(4, '0'));
+            navigate('#/bug/' + bug.id);
+        });
+    }
+
+    // ============================================================
+    // RENDER: BUG DETAIL
+    // ============================================================
+    function renderBugDetail(id) {
+        State.load();
+        const bug = State.getBug(id);
+        if (!bug) {
+            document.getElementById('app').innerHTML = `<div class="app-body"><div class="empty-state"><h2>Bug 不存在</h2></div></div>`;
+            return;
+        }
+
+        const u = State.currentUser;
+        const statusLabels = { new: '新建', assigned: '已分配', need_info: '需补充信息', fixed: '已修复', closed: '已关闭' };
+
+        // Determine available status transitions
+        const transitions = {
+            new: ['assigned', 'need_info'],
+            assigned: ['need_info', 'fixed', 'closed'],
+            need_info: ['assigned', 'fixed', 'closed'],
+            fixed: ['closed', 'new'], // closed or reopen
+            closed: ['new'] // reopen
+        };
+        const available = transitions[bug.status] || [];
+
+        // Status action buttons
+        let statusBtns = '';
+        if (u.role === 'employee' || u.role === 'admin') {
+            available.forEach(s => {
+                const cls = { assigned: 'btn-assign', need_info: 'btn-need-info', fixed: 'btn-fixed', closed: 'btn-close', new: 'btn-reopen' };
+                const labels = { assigned: '📋 分配', need_info: '❓ 需补充信息', fixed: '✅ 标记已修复', closed: '🔒 关闭', new: '🔄 重新打开' };
+                statusBtns += `<button class="btn-status ${cls[s]}" onclick="changeStatus(${bug.id}, '${s}')">${labels[s]}</button>`;
+            });
+        }
+
+        // Assignee select (for employees/admin)
+        let assignSection = '';
+        if (u.role === 'customer') {
+            const employees = State.getUsersByRole('employee');
+            const assignOpts = employees.map(e =>
+                `<option value="${e.username}" ${bug.assignee === e.username ? 'selected' : ''}>${e.name}</option>`
+            ).join('');
+            assignSection = `
+            <div class="sidebar-section">
+                <h4>指派给</h4>
+                <select id="bug-assignee-select" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;" onchange="assignBug(${bug.id}, this.value)">
+                    <option value="">-- 选择负责人 --</option>
+                    ${assignOpts}
+                </select>
+            </div>`;
+        }
+
+        // Attachment list
+        const attachList = bug.attachments.map(a => {
+            const sizeStr = (a.size / 1024).toFixed(1) + ' KB';
+            return `<div class="attachment-item">
+                📎 <a href="${a.data}" download="${a.name}">${a.name}</a>
+                <span style="color:#888;font-size:11px;">(${sizeStr})</span>
+                <span style="color:#888;font-size:11px;">by ${a.uploadedBy}</span>
+            </div>`;
+        }).join('') || '<div style="color:#888;font-size:13px;">暂无附件</div>';
+
+        // Comments
+        const comments = bug.comments.map(c => {
+            const colors = { admin: '#e74c3c', employee: '#3498db', customer: '#2ecc71' };
+            const roleLabels = { admin: '管理员', employee: '员工', customer: '客户' };
+            return `<div class="comment">
+                <div class="comment-avatar" style="background:${colors[c.authorRole]}">${c.authorName.charAt(0)}</div>
+                <div class="comment-body">
+                    <div class="comment-header">
+                        <span class="comment-author">${c.authorName} <span class="role-badge ${'role-' + c.authorRole}" style="font-size:10px;padding:1px 6px;">${roleLabels[c.authorRole]}</span></span>
+                        <span class="comment-time">${new Date(c.createdAt).toLocaleString('zh-CN')}</span>
+                    </div>
+                    <div class="comment-text">${escapeHtml(c.text)}</div>
+                </div>
+            </div>`;
+        }).join('') || '<div class="empty-state" style="padding:20px;color:#888;font-size:13px;">暂无评论</div>';
+
+        // Activity log
+        const logs = bug.history.map(h =>
+            `<div class="log-entry"><strong>${h.user}</strong> — ${h.action} <span style="color:#aaa;">${new Date(h.time).toLocaleString('zh-CN')}</span></div>`
+        ).join('');
+
+        // Upload area
+        const canUpload = u.role === 'customer' || u.role === 'employee' || u.role === 'admin';
+
+        document.getElementById('app').innerHTML = `
+        ${renderHeader()}
+        <div class="app-body">
+            <div class="bug-detail">
+                <div class="bug-detail-header">
+                    <div>
+                        <div class="back-link" onclick="navigate('#/dashboard')">← 返回列表</div>
+                        <h2>BUG-${String(bug.id).padStart(4, '0')}: ${escapeHtml(bug.title)}</h2>
+                        <div class="bug-meta">
+                            <span><span class="status-badge status-${bug.status}">${statusLabels[bug.status]}</span></span>
+                            <span>👤 报告人: ${bug.reporterName}</span>
+                            <span>📅 ${new Date(bug.createdAt).toLocaleString('zh-CN')}</span>
+                            ${bug.assignee ? `<span>🎯 负责人: ${State.users.find(x => x.username === bug.assignee)?.name || bug.assignee}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bug-detail-body">
+                    <div class="bug-content">
+                        <h4 style="margin-bottom:8px;color:#555;">问题描述</h4>
+                        <div class="bug-description">${escapeHtml(bug.description)}</div>
+
+                        <div class="activity-log">
+                            <h4>📋 操作记录</h4>
+                            ${logs}
+                        </div>
+                    </div>
+
+                    <div class="bug-sidebar">
+                        <div class="sidebar-section">
+                            <h4>状态操作</h4>
+                            <div class="status-actions">
+                                ${statusBtns || '<div style="color:#888;font-size:13px;">无可用操作</div>'}
+                            </div>
+                        </div>
+                        ${assignSection}
+                    </div>
+                </div>
+
+                <div class="attachments-section">
+                    <h3>📎 附件 (${bug.attachments.length})</h3>
+                    <div class="attachment-list">${attachList}</div>
+                    ${canUpload ? `
+                    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                        <input type="file" id="file-input" multiple onchange="handleFiles(this.files, ${bug.id})">
+                        <div>📁 点击或拖拽文件到此处上传</div>
+                        <div style="font-size:11px;margin-top:8px;color:#aaa;">支持日志文件、截图等，单个文件最大2MB</div>
+                    </div>` : ''}
+                </div>
+
+                <div class="comments-section">
+                    <h3>💬 评论 (${bug.comments.length})</h3>
+                    <div class="comment-list">${comments}</div>
+                    <div class="comment-form">
+                        <textarea id="comment-input" placeholder="输入评论..."></textarea>
+                        <button class="btn-primary" onclick="addComment(${bug.id})">发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Drag & drop
+            const uploadArea = document.getElementById('upload-area');
+            if (uploadArea) {
+                uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+                uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+                uploadArea.addEventListener('drop', e => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    handleFiles(e.dataTransfer.files, ${bug.id});
+                });
+            }
+        <\/script>`;
+    }
+
+    // ============================================================
+    // ACTIONS
+    // ============================================================
+    function changeStatus(bugId, newStatus) {
+        State.updateStatus(bugId, newStatus);
+        showToast('状态已更新');
+        renderBugDetail(bugId);
+    }
+
+    function assignBug(bugId, assignee) {
+        if (!assignee) return;
+        State.assignBug(bugId, assignee);
+        showToast('Bug 已重新分配');
+        renderBugDetail(bugId);
+    }
+
+    function addComment(bugId) {
+        const input = document.getElementById('comment-input');
+        const text = input.value.trim();
+        if (!text) return;
+        State.addComment(bugId, text);
+        input.value = '';
+        showToast('评论已添加');
+        renderBugDetail(bugId);
+    }
+
+    async function handleFiles(files, bugId) {
+        for (const file of files) {
+            const result = await State.addAttachment(bugId, file);
+            if (result) {
+                showToast(`附件 "${file.name}" 上传成功`);
+            }
+        }
+        renderBugDetail(bugId);
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    initData();
+    State.load();
+
+    // If there's a session but users list changed (re-init), restore session user
+    if (State.currentUser) {
+        renderDashboard();
+    } else {
+        renderLogin();
+    }
+    </script>
 </body>
 </html>
