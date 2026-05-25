@@ -364,19 +364,24 @@
     // ============================================================
     function navigate(route) {
         location.hash = route;
+        handleRoute();
     }
 
-    window.addEventListener('hashchange', () => {
+    function handleRoute() {
         if (!State.currentUser) return;
-        const hash = location.hash.slice(1);
+        const hash = location.hash;
         if (hash.startsWith('#/bug/')) {
             const id = parseInt(hash.split('/')[2]);
             renderBugDetail(id);
         } else if (hash === '#/new') {
             renderNewBug();
-        } else if (hash === '#/dashboard' || hash === '' || hash === '/') {
+        } else {
             renderDashboard();
         }
+    }
+
+    window.addEventListener('hashchange', () => {
+        handleRoute();
     });
 
     // ============================================================
