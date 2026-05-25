@@ -217,7 +217,7 @@
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             cloudSha = data.sha;
-            const decoded = atob(data.content.replace(/\n/g, ''));
+            const decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
             return JSON.parse(decoded);
         } catch (e) {
             console.warn('Cloud fetch failed, using local cache:', e);
@@ -754,30 +754,36 @@
 
         const u = State.currentUser;
         const statusLabels = { new: '新建', assigned: '已分配', need_info: '需补充信息', fixed: '已修复', closed: '已关闭' };
+        const isCustomer = u.role === 'customer';
+        const isEmployeeOrAdmin = u.role === 'employee' || u.role === 'admin';
 
-        // Determine available status transitions
-        const transitions = {
-            new: ['assigned', 'need_info'],
-            assigned: ['need_info', 'fixed', 'closed'],
-            need_info: ['assigned', 'fixed', 'closed'],
-            fixed: ['closed', 'new'], // closed or reopen
-            closed: ['new'] // reopen
-        };
-        const available = transitions[bug.status] || [];
-
-        // Status action buttons
-        let statusBtns = '';
-        if (u.role === 'employee' || u.role === 'admin') {
-            available.forEach(s => {
-                const cls = { assigned: 'btn-assign', need_info: 'btn-need-info', fixed: 'btn-fixed', closed: 'btn-close', new: 'btn-reopen' };
-                const labels = { assigned: '📋 分配', need_info: '❓ 需补充信息', fixed: '✅ 标记已修复', closed: '🔒 关闭', new: '🔄 重新打开' };
-                statusBtns += `<button class="btn-status ${cls[s]}" onclick="changeStatus(${bug.id}, '${s}')">${labels[s]}</button>`;
-            });
+        // --- Status dropdown (only for employee/admin) ---
+        let statusDropdownHtml = '';
+        if (isEmployeeOrAdmin) {
+            const allStatuses = ['new', 'assigned', 'need_info', 'fixed', 'closed'];
+            const opts = allStatuses.map(s =>
+                `<option value="${s}" ${bug.status === s ? 'selected' : ''}>${statusLabels[s]}</option>`
+            ).join('');
+            statusDropdownHtml = `
+            <div class="sidebar-section">
+                <h4>状态操作</h4>
+                <select id="status-select" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#fff;">
+                    ${opts}
+                </select>
+                <div style="font-size:11px;color:#888;margin-top:6px;">选择状态后发送评论生效</div>
+            </div>`;
+        } else {
+            statusDropdownHtml = `
+            <div class="sidebar-section">
+                <h4>当前状态</h4>
+                <div style="padding:8px 0;"><span class="status-badge status-${bug.status}">${statusLabels[bug.status]}</span></div>
+                <div style="font-size:11px;color:#888;margin-top:4px;">状态由公司员工管理</div>
+            </div>`;
         }
 
-        // Assignee select (for employees/admin)
+        // --- Assignee select (customer can assign/reassign) ---
         let assignSection = '';
-        if (u.role === 'customer') {
+        if (isCustomer) {
             const employees = State.getUsersByRole('employee');
             const assignOpts = employees.map(e =>
                 `<option value="${e.username}" ${bug.assignee === e.username ? 'selected' : ''}>${e.name}</option>`
@@ -790,9 +796,22 @@
                     ${assignOpts}
                 </select>
             </div>`;
+        } else if (isEmployeeOrAdmin) {
+            const employees = State.getUsersByRole('employee');
+            const assignOpts = employees.map(e =>
+                `<option value="${e.username}" ${bug.assignee === e.username ? 'selected' : ''}>${e.name}</option>`
+            ).join('');
+            assignSection = `
+            <div class="sidebar-section">
+                <h4>指派给</h4>
+                <select id="bug-assignee-select" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;" onchange="assignBug(${bug.id}, this.value)">
+                    <option value="">-- 未指派 --</option>
+                    ${assignOpts}
+                </select>
+            </div>`;
         }
 
-        // Attachment list
+        // --- Attachment list ---
         const attachList = bug.attachments.map(a => {
             const sizeStr = (a.size / 1024).toFixed(1) + ' KB';
             return `<div class="attachment-item">
@@ -802,7 +821,7 @@
             </div>`;
         }).join('') || '<div style="color:#888;font-size:13px;">暂无附件</div>';
 
-        // Comments
+        // --- Comments ---
         const comments = bug.comments.map(c => {
             const colors = { admin: '#e74c3c', employee: '#3498db', customer: '#2ecc71' };
             const roleLabels = { admin: '管理员', employee: '员工', customer: '客户' };
@@ -818,13 +837,26 @@
             </div>`;
         }).join('') || '<div class="empty-state" style="padding:20px;color:#888;font-size:13px;">暂无评论</div>';
 
-        // Activity log
-        const logs = bug.history.map(h =>
-            `<div class="log-entry"><strong>${h.user}</strong> — ${h.action} <span style="color:#aaa;">${new Date(h.time).toLocaleString('zh-CN')}</span></div>`
-        ).join('');
+        // --- Activity log (hidden for customers) ---
+        let activitySection = '';
+        if (isEmployeeOrAdmin) {
+            const logs = bug.history.map(h =>
+                `<div class="log-entry"><strong>${h.user}</strong> — ${h.action} <span style="color:#aaa;">${new Date(h.time).toLocaleString('zh-CN')}</span></div>`
+            ).join('');
+            activitySection = `
+            <div class="activity-log">
+                <h4>📋 操作记录</h4>
+                ${logs}
+            </div>`;
+        }
 
-        // Upload area
-        const canUpload = u.role === 'customer' || u.role === 'employee' || u.role === 'admin';
+        // --- Upload area ---
+        const canUpload = isCustomer || isEmployeeOrAdmin;
+
+        // --- Comment placeholder differs by role ---
+        const commentPlaceholder = isCustomer
+            ? '输入消息... 发送后状态自动变为"已分配"'
+            : '输入评论并选择新状态后发送...';
 
         document.getElementById('app').innerHTML = `
         ${renderHeader()}
@@ -847,20 +879,11 @@
                     <div class="bug-content">
                         <h4 style="margin-bottom:8px;color:#555;">问题描述</h4>
                         <div class="bug-description">${escapeHtml(bug.description)}</div>
-
-                        <div class="activity-log">
-                            <h4>📋 操作记录</h4>
-                            ${logs}
-                        </div>
+                        ${activitySection}
                     </div>
 
                     <div class="bug-sidebar">
-                        <div class="sidebar-section">
-                            <h4>状态操作</h4>
-                            <div class="status-actions">
-                                ${statusBtns || '<div style="color:#888;font-size:13px;">无可用操作</div>'}
-                            </div>
-                        </div>
+                        ${statusDropdownHtml}
                         ${assignSection}
                     </div>
                 </div>
@@ -880,7 +903,7 @@
                     <h3>💬 评论 (${bug.comments.length})</h3>
                     <div class="comment-list">${comments}</div>
                     <div class="comment-form">
-                        <textarea id="comment-input" placeholder="输入评论..."></textarea>
+                        <textarea id="comment-input" placeholder="${commentPlaceholder}"></textarea>
                         <button class="btn-primary" onclick="addComment(${bug.id})">发送</button>
                     </div>
                 </div>
@@ -905,12 +928,6 @@
     // ============================================================
     // ACTIONS
     // ============================================================
-    function changeStatus(bugId, newStatus) {
-        State.updateStatus(bugId, newStatus);
-        showToast('状态已更新');
-        renderBugDetail(bugId);
-    }
-
     function assignBug(bugId, assignee) {
         if (!assignee) return;
         State.assignBug(bugId, assignee);
@@ -922,6 +939,28 @@
         const input = document.getElementById('comment-input');
         const text = input.value.trim();
         if (!text) return;
+
+        const bug = State.getBug(bugId);
+        const u = State.currentUser;
+
+        // Customer: auto change status to "assigned" on first reply
+        if (u.role === 'customer') {
+            if (bug.status === 'new') {
+                State.updateStatus(bugId, 'assigned');
+            }
+        }
+
+        // Employee/admin: apply selected status from dropdown
+        if (u.role === 'employee' || u.role === 'admin') {
+            const statusSelect = document.getElementById('status-select');
+            if (statusSelect) {
+                const newStatus = statusSelect.value;
+                if (newStatus && newStatus !== bug.status) {
+                    State.updateStatus(bugId, newStatus);
+                }
+            }
+        }
+
         State.addComment(bugId, text);
         input.value = '';
         showToast('评论已添加');
