@@ -195,6 +195,97 @@
     }
 
     // ============================================================
+    // GITEE CLOUD SYNC
+    // ============================================================
+    const GITEE_CONFIG = {
+        owner: 'sz-h',
+        repo: 'helloworld',
+        path: 'bugtracker-data.json',
+        token: 'd1c044fc40256aa69b4274076c43adcf',
+        baseUrl: 'https://gitee.com/api/v5'
+    };
+
+    let cloudSha = null;
+    let syncStatus = 'idle'; // idle | syncing | synced | error
+    let syncTimeout = null;
+
+    async function cloudFetchData() {
+        try {
+            const resp = await fetch(
+                `${GITEE_CONFIG.baseUrl}/repos/${GITEE_CONFIG.owner}/${GITEE_CONFIG.repo}/contents/${GITEE_CONFIG.path}?access_token=${GITEE_CONFIG.token}`
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            cloudSha = data.sha;
+            const decoded = atob(data.content.replace(/\n/g, ''));
+            return JSON.parse(decoded);
+        } catch (e) {
+            console.warn('Cloud fetch failed, using local cache:', e);
+            return null;
+        }
+    }
+
+    async function cloudSaveData(data) {
+        try {
+            syncStatus = 'syncing';
+            updateSyncUI();
+
+            const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+            const payload = {
+                access_token: GITEE_CONFIG.token,
+                path: GITEE_CONFIG.path,
+                content: content,
+                message: `bugtracker auto-save ${new Date().toLocaleString('zh-CN')}`
+            };
+
+            if (cloudSha) payload.sha = cloudSha;
+
+            const method = cloudSha ? 'PUT' : 'POST';
+            const resp = await fetch(
+                `${GITEE_CONFIG.baseUrl}/repos/${GITEE_CONFIG.owner}/${GITEE_CONFIG.repo}/contents/${GITEE_CONFIG.path}`,
+                {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const result = await resp.json();
+            cloudSha = result.content.sha;
+            syncStatus = 'synced';
+        } catch (e) {
+            syncStatus = 'error';
+            console.error('Cloud save failed:', e);
+        } finally {
+            updateSyncUI();
+        }
+    }
+
+    function scheduleSync() {
+        if (syncTimeout) clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+            const data = {
+                bugs: State.bugs,
+                next_id: State.nextId
+            };
+            cloudSaveData(data);
+        }, 1000); // Debounce 1 second
+    }
+
+    function updateSyncUI() {
+        const el = document.getElementById('sync-indicator');
+        if (!el) return;
+        const icons = { idle: '☁️', syncing: '🔄', synced: '✅', error: '⚠️' };
+        const titles = { idle: '待同步', syncing: '同步中...', synced: '已同步', error: '同步失败' };
+        el.textContent = icons[syncStatus];
+        el.title = titles[syncStatus];
+        if (syncStatus === 'error') el.style.color = '#e74c3c';
+        else if (syncStatus === 'synced') el.style.color = '#2ecc71';
+        else el.style.color = '#667eea';
+    }
+
+    // ============================================================
     // STATE MANAGEMENT
     // ============================================================
     const State = {
@@ -202,15 +293,34 @@
         bugs: [],
         users: [],
         nextId: 1,
+        cloudLoaded: false,
 
         load() {
             this.users = JSON.parse(localStorage.getItem('bt_users') || '[]');
-            this.bugs = JSON.parse(localStorage.getItem('bt_bugs') || '[]');
-            this.nextId = parseInt(localStorage.getItem('bt_next_id') || '1');
+            // Bugs will be loaded from cloud or local cache
+        },
+        async loadFromCloud() {
+            const cloudData = await cloudFetchData();
+            if (cloudData && cloudData.bugs) {
+                this.bugs = cloudData.bugs;
+                this.nextId = cloudData.next_id || 1;
+                this.cloudLoaded = true;
+                // Save to localStorage as cache
+                localStorage.setItem('bt_bugs', JSON.stringify(this.bugs));
+                localStorage.setItem('bt_next_id', String(this.nextId));
+            } else {
+                // Fallback to local cache
+                this.bugs = JSON.parse(localStorage.getItem('bt_bugs') || '[]');
+                this.nextId = parseInt(localStorage.getItem('bt_next_id') || '1');
+            }
         },
         save() {
             localStorage.setItem('bt_bugs', JSON.stringify(this.bugs));
             localStorage.setItem('bt_next_id', String(this.nextId));
+            // Schedule cloud sync
+            if (this.cloudLoaded) {
+                scheduleSync();
+            }
         },
         getUsersByRole(role) {
             return this.users.filter(u => u.role === role);
@@ -321,11 +431,13 @@
     // ============================================================
     // AUTH
     // ============================================================
-    function login(username, password) {
+    async function login(username, password) {
         const user = State.users.find(u => u.username === username && u.password === password);
         if (user) {
             State.currentUser = user;
             localStorage.setItem('bt_session', JSON.stringify(user));
+            // Load data from cloud
+            await State.loadFromCloud();
             return true;
         }
         return false;
@@ -412,12 +524,11 @@
             </div>
         </div>`;
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const u = document.getElementById('login-user').value.trim();
             const p = document.getElementById('login-pass').value;
-            if (login(u, p)) {
-                State.load();
+            if (await login(u, p)) {
                 navigate('#/dashboard');
             } else {
                 document.getElementById('login-error').textContent = '用户名或密码错误';
@@ -436,6 +547,7 @@
         <header class="app-header">
             <div class="logo">🐛 BugTracker</div>
             <div class="user-info">
+                <span id="sync-indicator" title="云端同步状态" style="font-size:16px;cursor:pointer;">☁️</span>
                 <span class="user-name">${u.name}</span>
                 <span class="role-badge ${roleClass[u.role]}">${roleLabel[u.role]}</span>
                 <button class="btn-logout" onclick="logout()">退出登录</button>
@@ -838,9 +950,14 @@
     initData();
     State.load();
 
-    // If there's a session but users list changed (re-init), restore session user
-    if (State.currentUser) {
-        renderDashboard();
+    // Restore session from localStorage
+    const savedSession = localStorage.getItem('bt_session');
+    if (savedSession) {
+        State.currentUser = JSON.parse(savedSession);
+        // Load data from cloud when restoring session
+        State.loadFromCloud().then(() => {
+            navigate('#/dashboard');
+        });
     } else {
         renderLogin();
     }
