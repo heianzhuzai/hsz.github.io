@@ -329,6 +329,7 @@
             return this.bugs.find(b => b.id === id);
         },
         addBug(data) {
+            const now = new Date().toISOString();
             const bug = {
                 id: this.nextId++,
                 title: data.title,
@@ -339,9 +340,11 @@
                 reporterName: this.currentUser.name,
                 comments: [],
                 attachments: [],
-                history: [{ action: 'Created', user: this.currentUser.name, time: new Date().toISOString() }],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                statusHistory: [{ status: 'new', changedAt: now }],
+                statusChangedAt: now,
+                history: [{ action: 'Created', user: this.currentUser.name, time: now }],
+                createdAt: now,
+                updatedAt: now
             };
             this.bugs.unshift(bug);
             this.save();
@@ -370,12 +373,16 @@
             const bug = this.getBug(bugId);
             if (!bug) return;
             const oldStatus = bug.status;
+            const now = new Date().toISOString();
             bug.status = newStatus;
-            bug.updatedAt = new Date().toISOString();
+            bug.statusChangedAt = now;
+            if (!bug.statusHistory) bug.statusHistory = [];
+            bug.statusHistory.push({ status: newStatus, changedAt: now, fromStatus: oldStatus });
+            bug.updatedAt = now;
             bug.history.push({
                 action: `Status changed: ${oldStatus} → ${newStatus}`,
                 user: this.currentUser.name,
-                time: new Date().toISOString()
+                time: now
             });
             this.save();
         },
@@ -603,6 +610,7 @@
         const rows = filteredBugs.map(b => {
             const emp = State.users.find(x => x.username === b.assignee);
             const assigneeName = emp ? emp.name : (b.assignee ? b.assignee : '-');
+            const duration = formatDuration(b.statusChangedAt || b.createdAt);
             return `<tr>
                 <td class="bug-id" onclick="navigate('#/bug/${b.id}')">BUG-${String(b.id).padStart(4, '0')}</td>
                 <td class="bug-title" onclick="navigate('#/bug/${b.id}')" title="${b.title}">${b.title}</td>
@@ -610,6 +618,7 @@
                 <td>${assigneeName}</td>
                 <td>${b.reporterName}</td>
                 <td style="color:#888;font-size:12px;">${new Date(b.updatedAt).toLocaleString('zh-CN')}</td>
+                <td style="font-size:12px;color:#f59e0b;font-weight:600;" title="当前状态持续时间">⏱ ${duration}</td>
                 <td>${b.comments.length}</td>
                 <td>${b.attachments.length}</td>
             </tr>`;
@@ -643,17 +652,17 @@
             <div class="bug-table" id="bug-table-body">
                 <table>
                     <thead><tr>
-                        <th>编号</th><th>标题</th><th>状态</th><th>负责人</th><th>报告人</th><th>更新时间</th><th>评论</th><th>附件</th>
+                        <th>编号</th><th>标题</th><th>状态</th><th>负责人</th><th>报告人</th><th>更新时间</th><th>⏱时长</th><th>评论</th><th>附件</th>
                     </tr></thead>
                     <tbody id="bug-tbody">
-                        ${rows || '<tr><td colspan="8" class="empty-state">暂无Bug记录</td></tr>'}
+                        ${rows || '<tr><td colspan="9" class="empty-state">暂无Bug记录</td></tr>'}
                     </tbody>
                 </table>
             </div>
         </div>
         <script>
             // Store all bugs data for filtering
-            window._allBugs = ${JSON.stringify(filteredBugs.map(b => ({...b, reporterName: b.reporterName, status: b.status, assignee: b.assignee, id: b.id, title: b.title, reporter: b.reporter, comments: b.comments, attachments: b.attachments, updatedAt: b.updatedAt})))};
+            window._allBugs = ${JSON.stringify(filteredBugs.map(b => ({...b, reporterName: b.reporterName, status: b.status, assignee: b.assignee, id: b.id, title: b.title, reporter: b.reporter, comments: b.comments, attachments: b.attachments, updatedAt: b.updatedAt, statusChangedAt: b.statusChangedAt, createdAt: b.createdAt})))};
             window._statusLabels = ${JSON.stringify(statusLabels)};
             window._users = ${JSON.stringify(State.users)};
 
@@ -669,13 +678,14 @@
 
                 const tbody = document.getElementById('bug-tbody');
                 if (filtered.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">无匹配记录</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">无匹配记录</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = filtered.map(b => {
                     const emp = window._users.find(x => x.username === b.assignee);
                     const assigneeName = emp ? emp.name : (b.assignee ? b.assignee : '-');
+                    const duration = formatDuration(b.statusChangedAt || b.createdAt);
                     return '<tr>' +
                         '<td class="bug-id" onclick="navigate(\'#/bug/' + b.id + '\')">BUG-' + String(b.id).padStart(4, '0') + '</td>' +
                         '<td class="bug-title" onclick="navigate(\'#/bug/' + b.id + '\')" title="' + b.title + '">' + b.title + '</td>' +
@@ -683,6 +693,7 @@
                         '<td>' + assigneeName + '</td>' +
                         '<td>' + b.reporterName + '</td>' +
                         '<td style="color:#888;font-size:12px;">' + new Date(b.updatedAt).toLocaleString('zh-CN') + '</td>' +
+                        '<td style="font-size:12px;color:#f59e0b;font-weight:600;" title="当前状态持续时间">⏱ ' + duration + '</td>' +
                         '<td>' + b.comments.length + '</td>' +
                         '<td>' + b.attachments.length + '</td>' +
                     '</tr>';
@@ -764,6 +775,7 @@
             const opts = allStatuses.map(s =>
                 `<option value="${s}" ${bug.status === s ? 'selected' : ''}>${statusLabels[s]}</option>`
             ).join('');
+            const duration = formatDuration(bug.statusChangedAt || bug.createdAt);
             statusDropdownHtml = `
             <div class="sidebar-section">
                 <h4>状态操作</h4>
@@ -771,12 +783,15 @@
                     ${opts}
                 </select>
                 <div style="font-size:11px;color:#888;margin-top:6px;">选择状态后发送评论生效</div>
+                <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-top:8px;">⏱ 当前状态已持续: ${duration}</div>
             </div>`;
         } else {
+            const duration = formatDuration(bug.statusChangedAt || bug.createdAt);
             statusDropdownHtml = `
             <div class="sidebar-section">
                 <h4>当前状态</h4>
                 <div style="padding:8px 0;"><span class="status-badge status-${bug.status}">${statusLabels[bug.status]}</span></div>
+                <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-top:4px;">⏱ 已持续: ${duration}</div>
                 <div style="font-size:11px;color:#888;margin-top:4px;">状态由公司员工管理</div>
             </div>`;
         }
@@ -943,13 +958,6 @@
         const bug = State.getBug(bugId);
         const u = State.currentUser;
 
-        // Customer: auto change status to "assigned" on first reply
-        if (u.role === 'customer') {
-            if (bug.status === 'new') {
-                State.updateStatus(bugId, 'assigned');
-            }
-        }
-
         // Employee/admin: apply selected status from dropdown
         if (u.role === 'employee' || u.role === 'admin') {
             const statusSelect = document.getElementById('status-select');
@@ -958,6 +966,13 @@
                 if (newStatus && newStatus !== bug.status) {
                     State.updateStatus(bugId, newStatus);
                 }
+            }
+        }
+
+        // Customer: auto change to "assigned" on any reply
+        if (u.role === 'customer') {
+            if (bug.status !== 'assigned') {
+                State.updateStatus(bugId, 'assigned');
             }
         }
 
@@ -981,6 +996,20 @@
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function formatDuration(isoStr) {
+        if (!isoStr) return '-';
+        const diff = Date.now() - new Date(isoStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return '刚刚';
+        if (mins < 60) return mins + '分钟';
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return hours + '小时' + (mins % 60) + '分钟';
+        const days = Math.floor(hours / 24);
+        if (days < 30) return days + '天' + (hours % 24) + '小时';
+        const months = Math.floor(days / 30);
+        return months + '个月' + (days % 30) + '天';
     }
 
     // ============================================================
