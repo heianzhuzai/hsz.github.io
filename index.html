@@ -168,14 +168,14 @@
     // ============================================================
     const DEFAULT_USERS = [
         // Admin
-        { username: 'admin', password: 'admin123', role: 'admin', name: '系统管理员' },
+        { username: 'admin', password: 'admin123', role: 'admin', name: 'admin' },
         // Employees (6)
-        { username: 'rd1', password: 'emp123', role: 'employee', name: '张三 - 开发' },
-        { username: 'rd2', password: 'emp123', role: 'employee', name: '李四 - 开发' },
-        { username: 'rd3', password: 'emp123', role: 'employee', name: '王五 - 测试' },
-        { username: 'rd4', password: 'emp123', role: 'employee', name: '赵六 - 运维' },
-        { username: 'rd5', password: 'emp123', role: 'employee', name: '孙七 - 产品' },
-        { username: 'rd6', password: 'emp123', role: 'employee', name: '周八 - 技术支持' },
+        { username: 'rd1', password: 'emp123', role: 'employee', name: 'rd1' },
+        { username: 'rd2', password: 'emp123', role: 'employee', name: 'rd2' },
+        { username: 'rd3', password: 'emp123', role: 'employee', name: 'rd3' },
+        { username: 'rd4', password: 'emp123', role: 'employee', name: 'rd4' },
+        { username: 'rd5', password: 'emp123', role: 'employee', name: 'rd5' },
+        { username: 'rd6', password: 'emp123', role: 'employee', name: 'rd6' },
         // Customers (6)
         { username: 'client1', password: 'cus123', role: 'customer', name: 'client1' },
         { username: 'client2', password: 'cus123', role: 'customer', name: 'client2' },
@@ -186,8 +186,9 @@
     ];
 
     function initData() {
+        // Always sync users from DEFAULT_USERS to localStorage
+        localStorage.setItem('bt_users', JSON.stringify(DEFAULT_USERS));
         if (!localStorage.getItem('bt_initialized')) {
-            localStorage.setItem('bt_users', JSON.stringify(DEFAULT_USERS));
             localStorage.setItem('bt_bugs', JSON.stringify([]));
             localStorage.setItem('bt_next_id', '1');
             localStorage.setItem('bt_initialized', '1');
@@ -555,7 +556,7 @@
             <div class="logo">🐛 Bugzilla</div>
             <div class="user-info">
                 <span id="sync-indicator" title="云端同步状态" style="font-size:16px;cursor:pointer;">☁️</span>
-                <span class="user-name">${u.name}</span>
+                <span class="user-name">${u.username}</span>
                 <span class="role-badge ${roleClass[u.role]}">${roleLabel[u.role]}</span>
                 <button class="btn-logout" onclick="logout()">退出登录</button>
             </div>
@@ -883,9 +884,9 @@
                         <h2>BUG-${String(bug.id).padStart(4, '0')}: ${escapeHtml(bug.title)}</h2>
                         <div class="bug-meta">
                             <span><span class="status-badge status-${bug.status}">${statusLabels[bug.status]}</span></span>
-                            <span>👤 报告人: ${bug.reporterName}</span>
+                            <span>👤 报告人: ${bug.reporter}</span>
                             <span>📅 ${new Date(bug.createdAt).toLocaleString('zh-CN')}</span>
-                            ${bug.assignee ? `<span>🎯 负责人: ${State.users.find(x => x.username === bug.assignee)?.name || bug.assignee}</span>` : ''}
+                            ${bug.assignee ? `<span>🎯 责任人: ${bug.assignee}</span>` : ''}
                         </div>
                     </div>
                 </div>
