@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BugTracker - 简易Bug管理系统</title>
+    <title>Bugzilla - 简易Bug管理系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; min-height: 100vh; }
@@ -170,19 +170,19 @@
         // Admin
         { username: 'admin', password: 'admin123', role: 'admin', name: '系统管理员' },
         // Employees (6)
-        { username: 'zhangsan', password: 'emp123', role: 'employee', name: '张三 - 开发' },
-        { username: 'lisi', password: 'emp123', role: 'employee', name: '李四 - 开发' },
-        { username: 'wangwu', password: 'emp123', role: 'employee', name: '王五 - 测试' },
-        { username: 'zhaoliu', password: 'emp123', role: 'employee', name: '赵六 - 运维' },
-        { username: 'sunqi', password: 'emp123', role: 'employee', name: '孙七 - 产品' },
-        { username: 'zhou8', password: 'emp123', role: 'employee', name: '周八 - 技术支持' },
+        { username: 'rd1', password: 'emp123', role: 'employee', name: '张三 - 开发' },
+        { username: 'rd2', password: 'emp123', role: 'employee', name: '李四 - 开发' },
+        { username: 'rd3', password: 'emp123', role: 'employee', name: '王五 - 测试' },
+        { username: 'rd4', password: 'emp123', role: 'employee', name: '赵六 - 运维' },
+        { username: 'rd5', password: 'emp123', role: 'employee', name: '孙七 - 产品' },
+        { username: 'rd6', password: 'emp123', role: 'employee', name: '周八 - 技术支持' },
         // Customers (6)
-        { username: 'client1', password: 'cus123', role: 'customer', name: '客户-张三' },
-        { username: 'client2', password: 'cus123', role: 'customer', name: '客户-李四' },
-        { username: 'client3', password: 'cus123', role: 'customer', name: '客户-王五' },
-        { username: 'client4', password: 'cus123', role: 'customer', name: '客户-赵六' },
-        { username: 'client5', password: 'cus123', role: 'customer', name: '客户-孙七' },
-        { username: 'client6', password: 'cus123', role: 'customer', name: '客户-周八' }
+        { username: 'client1', password: 'cus123', role: 'customer', name: 'client1' },
+        { username: 'client2', password: 'cus123', role: 'customer', name: 'client2' },
+        { username: 'client3', password: 'cus123', role: 'customer', name: 'client3' },
+        { username: 'client4', password: 'cus123', role: 'customer', name: 'client4' },
+        { username: 'client5', password: 'cus123', role: 'customer', name: 'client5' },
+        { username: 'client6', password: 'cus123', role: 'customer', name: 'client6' }
     ];
 
     function initData() {
@@ -511,7 +511,7 @@
         document.getElementById('app').innerHTML = `
         <div class="login-container">
             <div class="login-box">
-                <h1>🐛 BugTracker</h1>
+                <h1>🐛 Bugzilla</h1>
                 <p class="subtitle">简易Bug管理系统</p>
                 <form id="login-form">
                     <input type="text" id="login-user" placeholder="用户名" required autofocus>
@@ -524,7 +524,7 @@
                     <table>
                         <tr><th>角色</th><th>用户名</th><th>密码</th></tr>
                         <tr><td><span class="role-badge role-admin">管理员</span></td><td>admin</td><td>admin123</td></tr>
-                        <tr><td><span class="role-badge role-employee">员工</span></td><td>zhangsan ~ zhou8</td><td>emp123</td></tr>
+                        <tr><td><span class="role-badge role-employee">员工</span></td><td>rd1 ~ rd6</td><td>emp123</td></tr>
                         <tr><td><span class="role-badge role-customer">客户</span></td><td>client1 ~ client6</td><td>cus123</td></tr>
                     </table>
                 </details>
@@ -552,7 +552,7 @@
         const roleClass = { admin: 'role-admin', employee: 'role-employee', customer: 'role-customer' };
         return `
         <header class="app-header">
-            <div class="logo">🐛 BugTracker</div>
+            <div class="logo">🐛 Bugzilla</div>
             <div class="user-info">
                 <span id="sync-indicator" title="云端同步状态" style="font-size:16px;cursor:pointer;">☁️</span>
                 <span class="user-name">${u.name}</span>
@@ -615,8 +615,8 @@
                 <td class="bug-id" onclick="navigate('#/bug/${b.id}')">BUG-${String(b.id).padStart(4, '0')}</td>
                 <td class="bug-title" onclick="navigate('#/bug/${b.id}')" title="${b.title}">${b.title}</td>
                 <td><span class="status-badge status-${b.status}">${statusLabels[b.status]}</span></td>
-                <td>${assigneeName}</td>
-                <td>${b.reporterName}</td>
+                <td>${b.assignee || '-'}</td>
+                <td>${b.reporter}</td>
                 <td style="color:#888;font-size:12px;">${new Date(b.updatedAt).toLocaleString('zh-CN')}</td>
                 <td style="font-size:12px;color:#f59e0b;font-weight:600;" title="当前状态持续时间">⏱ ${duration}</td>
                 <td>${b.comments.length}</td>
@@ -652,7 +652,7 @@
             <div class="bug-table" id="bug-table-body">
                 <table>
                     <thead><tr>
-                        <th>编号</th><th>标题</th><th>状态</th><th>负责人</th><th>报告人</th><th>更新时间</th><th>⏱时长</th><th>评论</th><th>附件</th>
+                        <th>编号</th><th>标题</th><th>状态</th><th>责任人</th><th>报告人</th><th>更新时间</th><th>⏱时长</th><th>评论</th><th>附件</th>
                     </tr></thead>
                     <tbody id="bug-tbody">
                         ${rows || '<tr><td colspan="9" class="empty-state">暂无Bug记录</td></tr>'}
@@ -690,8 +690,8 @@
                         '<td class="bug-id" onclick="navigate(\'#/bug/' + b.id + '\')">BUG-' + String(b.id).padStart(4, '0') + '</td>' +
                         '<td class="bug-title" onclick="navigate(\'#/bug/' + b.id + '\')" title="' + b.title + '">' + b.title + '</td>' +
                         '<td><span class="status-badge status-' + b.status + '">' + window._statusLabels[b.status] + '</span></td>' +
-                        '<td>' + assigneeName + '</td>' +
-                        '<td>' + b.reporterName + '</td>' +
+                        '<td>' + (b.assignee || '-') + '</td>' +
+                        '<td>' + b.reporter + '</td>' +
                         '<td style="color:#888;font-size:12px;">' + new Date(b.updatedAt).toLocaleString('zh-CN') + '</td>' +
                         '<td style="font-size:12px;color:#f59e0b;font-weight:600;" title="当前状态持续时间">⏱ ' + duration + '</td>' +
                         '<td>' + b.comments.length + '</td>' +
